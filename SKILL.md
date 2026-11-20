@@ -1,6 +1,6 @@
 ---
 name: kpop-stage-mix
-description: Use when asked to make, cut, redo or fix a K-pop stage mix / 一鍵換裝 / 一键换装 / 換裝混剪 / 교차편집 (outfit-change edit - one song assembled from several music-show stages / 打歌舞台 so the outfit changes on a face-matched cut), or to reverse-engineer or compare existing stage mixes. Not for edits of a single video such as highlights, fancam cuts or subtitles.
+description: Use when asked to make, cut, redo or fix a K-pop stage mix / 一鍵換裝 / 一键换装 / 換裝混剪 / 교차편집 / ステージミックス / 交差編集 (outfit-change edit - one song assembled from several music-show stages / 打歌舞台 so the outfit changes on a face-matched cut), or to reverse-engineer or compare existing stage mixes. Not for edits of a single video such as highlights, fancam cuts or subtitles.
 ---
 
 # K-pop Stage Mix (一鍵換裝 / 교차편집)

@@ -1,8 +1,38 @@
 # kpop-stage-mix
 
+[English](README.md) | **繁體中文** | [日本語](README.ja.md) | [한국어](README.ko.md)
+
 給 Claude Code 與 Codex 使用的 Agent Skill：把同一首歌在各音樂節目的打歌舞台，剪成一支「一鍵換裝」stage mix（교차편집）。整首歌連續播放，畫面在不同場次之間切換，切換瞬間同一位成員的臉停在同樣的位置與大小，只有服裝和舞台換掉。
 
-對 agent 說「幫我剪〈歌名〉的一鍵換裝」或「make a stage mix of …」就會觸發。
+對 agent 說「幫我剪〈歌名〉的一鍵換裝」（或 "make a stage mix of …"、「〈曲名〉のステージミックスを作って」、「〈곡명〉 교차편집 만들어 줘」）就會觸發。
+
+## 樣片
+
+以下四段都節錄自這套流程全自動剪出的成片，沒有手動修過接點。GIF 寬 480 px；前兩段為 15 fps，後兩段為 29.97 fps。
+
+**連續切換：A2O LITE〈NEON〉，成片 1:05–1:11**
+
+6 秒內換 4 次舞台：M2 → Show Champion → Music Bank → M2 → Show! Music Core。第二次切換是十人隊形的遠景，只有一張臉朝向鏡頭，就靠這張臉把整排隊形對齊。
+
+![NEON：6 秒內換 4 次舞台](samples/neon_rapid_changes.gif)
+
+**同一位成員連換：BESTie〈Love Options〉，成片 1:10–1:17**
+
+鏡頭一直跟著同一位成員，7 秒內換 4 次舞台：Music Bank → Show! Music Core 11/14 → Show! Music Core 10/31 → Music Bank → Show! Music Core 11/14。中間一段是電視台自己切的遠景。
+
+![Love Options：同一位成員 7 秒內換 4 次舞台](samples/love_options_same_member.gif)
+
+**三人同時對位：A2O LITE〈NEON〉，成片 3:10**
+
+Show! Music Core → THE SHOW。三位成員並排，縮放和位移要讓三張臉同時落在原位，不只對準一張。
+
+![NEON：三位成員同時對位](samples/neon_trio_match.gif)
+
+**1 秒內連換兩次，第二次兩人同框：BESTie〈Love Options〉，成片 0:22–0:24**
+
+Music Bank → Show! Music Core → 人氣歌謠。第二次切換時兩位成員同框，兩張臉一起對位。
+
+![Love Options：兩人同框對位](samples/love_options_pair_match.gif)
 
 ## 內容
 
@@ -66,5 +96,11 @@ ln -s ~/kpop-stage-mix ~/.codex/skills/kpop-stage-mix
 ## 注意事項
 
 - 輸出固定為 16:9、1920x1080、29.97 fps，音軌用錄音室版。
-- 這個 repo 不含任何影音素材。打歌舞台與音源的著作權屬於電視台與唱片公司，下載、使用與公開成品前請自行確認權利。
+- 打歌舞台與音源的著作權屬於電視台與唱片公司，下載、使用與公開成品前請自行確認權利。
 - 人臉模型使用 insightface 的 `buffalo_l`，其授權僅限非商業研究用途。
+
+## 授權
+
+程式碼與文件以 [MIT License](LICENSE) 授權。
+
+`samples/` 裡的 GIF 節錄自電視台的打歌舞台畫面，著作權屬於各電視台與唱片公司，不在 MIT 授權範圍內，放在這裡只為展示剪接效果。
