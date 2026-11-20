@@ -44,19 +44,19 @@ scripts/                 整條流程的工具（Python + ffmpeg）
 Claude Code：
 
 ```bash
-git clone https://github.com/<帳號>/kpop-stage-mix ~/.claude/skills/kpop-stage-mix
+git clone https://github.com/boson-1/kpop-stage-mix ~/.claude/skills/kpop-stage-mix
 ```
 
 Codex：
 
 ```bash
-git clone https://github.com/<帳號>/kpop-stage-mix ~/.codex/skills/kpop-stage-mix
+git clone https://github.com/boson-1/kpop-stage-mix ~/.codex/skills/kpop-stage-mix
 ```
 
 兩邊共用同一份：
 
 ```bash
-git clone https://github.com/<帳號>/kpop-stage-mix ~/kpop-stage-mix
+git clone https://github.com/boson-1/kpop-stage-mix ~/kpop-stage-mix
 ln -s ~/kpop-stage-mix ~/.claude/skills/kpop-stage-mix
 ln -s ~/kpop-stage-mix ~/.codex/skills/kpop-stage-mix
 ```
