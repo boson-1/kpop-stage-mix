@@ -1,0 +1,11 @@
+__pycache__/
+*.pyc
+.venv/
+# media and intermediates never belong in this repo
+*.mp4
+*.m4a
+*.wav
+*.raw
+*.npz
+*.npy
+*.jpg
