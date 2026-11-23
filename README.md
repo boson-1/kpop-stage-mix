@@ -4,11 +4,13 @@
 
 An agent skill for Claude Code and Codex that cuts a K-pop stage mix (교차편집, 一鍵換裝): one song plays straight through while the picture jumps between the group's performances on different music shows. At every jump the same member's face stays at the same place and size, so only the outfit and the stage change.
 
+Most jumps are a dissolve of a few frames. Since v0.2, jumps that land on a strong beat get a mask transition instead: an iris that opens out of the member's face, or a soft edge that sweeps over the frame.
+
 Ask the agent to "make a stage mix of &lt;song&gt;" (or 「幫我剪〈歌名〉的一鍵換裝」, 「〈曲名〉のステージミックスを作って」, 「〈곡명〉 교차편집 만들어 줘」) and the skill takes over.
 
 ## Samples
 
-All four excerpts come from mixes the pipeline cut fully automatically; no join was fixed by hand. The GIFs are 480 px wide; the first two run at 15 fps, the last two at 29.97 fps.
+All four excerpts come from mixes the pipeline cut fully automatically; no join was fixed by hand. They were made with v0.1, so every change in them is a dissolve. The GIFs are 480 px wide; the first two run at 15 fps, the last two at 29.97 fps.
 
 **Rapid changes: A2O LITE "NEON", 1:05–1:11 of the mix**
 
@@ -37,10 +39,11 @@ Music Bank → Show! Music Core → Inkigayo. At the second change two members s
 ## Contents
 
 ```
-SKILL.md                 workflow, the pass condition of every step, known pitfalls, what to report
-references/sourcing.md   finding, choosing, naming and downloading the stages and the studio recording
-references/tuning.md     how the edit is planned and what can be tuned, how human editors work, tools to analyse and compare other mixes
-scripts/                 the tools of the whole pipeline (Python + ffmpeg)
+SKILL.md                    workflow, the pass condition of every step, known pitfalls, what to report
+references/sourcing.md      finding, choosing, naming and downloading the stages and the studio recording
+references/tuning.md        how the edit is planned and what can be tuned, how human editors work, tools to analyse and compare other mixes
+references/transitions.md   the mask transitions, the film and television techniques they were chosen from, how to add one
+scripts/                    the tools of the whole pipeline (Python + ffmpeg)
 ```
 
 | Tool | What it does |
@@ -53,8 +56,8 @@ scripts/                 the tools of the whole pipeline (Python + ffmpeg)
 | `faces.py` | face detection and identity features for every frame (insightface) |
 | `check_sync.py` | measures the picture sync between stages from the members' face trajectories; `--apply` writes the correction back |
 | `beats.py` | beat grid and bar starts |
-| `plan.py` | finds every point where the outfit can change and picks the edit for the whole song by dynamic programming |
-| `render.py` | renders the edit, staying in YUV 4:2:0 from decoder to encoder |
+| `plan.py` | finds every point where the outfit can change, picks the edit for the whole song by dynamic programming, and gives the changes on strong beats a mask transition |
+| `render.py` | renders the edit with its dissolves, irises and sweeps, staying in YUV 4:2:0 from decoder to encoder |
 | `sheet.py` | contact sheets of the frames around every join, for checking them one by one |
 | `verify.py` | checks the finished video: decoding, audio position, no visible border, frame placement; lists what a person should watch |
 | `analyze_mix.py` | reconstructs the edit of someone else's mix by matching it against the original stages |

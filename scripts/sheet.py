@@ -1,7 +1,9 @@
 """Contact sheets of the stage changes in a full-length render, for eyeballing the joins.
 
 Each row is one change: frames -3 -2 -1 | 0 +1 +3 around the first frame of the new stage.
-Label:  #shot  time in the video  from>to stage  kind, and for a face-matched change
+A mask transition (iris, sweep) takes longer, so its row runs from the frame before it
+starts to the frame after it ends; every tile carries its frame offset, and 0 is always there.
+Label:  #shot  time in the video  from>to stage  kind (or the mask transition), and for a face-matched change
   q     how invisible the plan expects the join to be, 0..1
   res   landmark mismatch after alignment, in face heights
   dr    how far the two faces drift apart 3 frames away, in face heights
@@ -24,6 +26,15 @@ import cv2
 import numpy as np
 
 OFFS = (-3, -2, -1, 0, 1, 3)
+
+
+def offsets(shot):
+    fx = shot.get("fx")
+    if not fx:
+        return OFFS
+    o = np.linspace(-fx["pre"] - 1, fx["post"] + 1, len(OFFS)).round().astype(int)
+    o[1 + np.abs(o[1:-1]).argmin()] = 0
+    return o
 
 
 def frames(video, size, fps, start=None, n=None):
@@ -53,14 +64,16 @@ def main():
         if i == 0 or (i not in picked if picked else which != "all" and s["kind"] != which):
             continue
         k = s["start"] - edl["f0"]
-        first = max(k + OFFS[0], 0)
-        fr = frames(video, size, fps, first, OFFS[-1] - OFFS[0] + 1) if picked else whole[first:]
+        offs = offsets(s)
+        first = max(k + offs[0], 0)
+        fr = frames(video, size, fps, first, offs[-1] - offs[0] + 1) if picked else whole[first:]
         tiles = []
-        for o in OFFS:
+        for o in offs:
             t = fr[min(max(k + o - first, 0), len(fr) - 1)].copy()
             cv2.putText(t, f"{o:+d}", (4, size[1] - 6), 0, 0.5 * big, (0, 255, 0), big)
             tiles.append(t)
-        lab = f"#{i} {int(k / fps // 60)}:{k / fps % 60:04.1f} {shots[i - 1]['src'][:2]}>{s['src'][:2]} {s['kind']}"
+        lab = (f"#{i} {int(k / fps // 60)}:{k / fps % 60:04.1f} {shots[i - 1]['src'][:2]}>{s['src'][:2]} "
+               f"{s['fx']['type'] if 'fx' in s else s['kind']}")
         if s["kind"] == "match":
             sim = "--" if s["sim"] is None else f"{s['sim']:.2f}"
             lab += (f" q{s['q']:.2f} res{s['res']:.2f} dr{s['drift']:.2f} z{s['cam_out']['z']:.2f}>{s['cam_in']['z']:.2f}"

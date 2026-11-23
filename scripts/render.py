@@ -3,8 +3,14 @@
 Every shot is seen through a "virtual camera" (zoom + shift, never showing a
 border).  At a face-matched change the outgoing and incoming cameras are the pair
 solved in plan.py, so the member's face sits at the same place and size in both
-pictures while they cross-dissolve.  Between changes the camera eases back, or
+pictures while one replaces the other.  Between changes the camera eases back, or
 snaps back invisibly on the broadcast director's own camera cut.
+
+A change is a short cross-dissolve, or the mask transition plan.py gave it ("fx" in the EDL).
+A mask transition is a wipe in the textbook sense: a grayscale card says in which order the
+pixels change (0 first .. 1 last) and a soft edge travels through that order.
+  iris   the card is the distance from the matched face: the new stage opens out of the face
+  sweep  the card is a ramp along "dir": a straight soft edge crosses the frame
 
 Pictures stay in their native YUV 4:2:0 from decoder to encoder: going through RGB
 clips the saturated stage lighting and resamples the colour planes twice.
@@ -31,6 +37,7 @@ FADE = 22                    # frames of fade-out at the very end
 W, H = sm.W, sm.H
 CW, CH = W // 2, H // 2
 FRAME_BYTES = W * H * 3 // 2
+YS, XS = np.mgrid[0:H, 0:W].astype(np.float32)
 
 
 def cam_of(d):
@@ -57,6 +64,40 @@ def blend(a, b, alpha):
     return tuple(cv2.addWeighted(p, 1 - alpha, q, alpha, 0) for p, q in zip(a, b))
 
 
+def order_map(fx):
+    """The card of a mask transition: when each pixel changes, 0 first .. 1 last."""
+    if fx["type"] == "iris":
+        g = np.hypot(XS - fx["c"][0], YS - fx["c"][1])
+    else:
+        g = XS * fx["dir"][0] + YS * fx["dir"][1]
+    g -= g.min()
+    return g / g.max()
+
+
+def matte(a, b, order, p, soft):
+    """a where the soft edge has not arrived yet, b where it has passed; p is the progress 0..1."""
+    m = np.clip((p * (1 + soft) - order) / soft, 0, 1)
+    m = m * m * (3 - 2 * m)
+    mc = cv2.resize(m, (CW, CH), interpolation=cv2.INTER_AREA)
+    return tuple(cv2.blendLinear(x, y, 1 - w, w) for x, y, w in zip(a, b, (m, mc, mc)))
+
+
+def join(a, b, t, f, start):
+    """Frame f of the change from picture a to picture b that the EDL puts at frame `start`."""
+    p = (f - (start - t["pre"]) + 1) / (t["pre"] + t["post"] + 1)          # in a dissolve: weight of the incoming shot
+    if t["type"] == "dissolve":
+        return blend(a, b, p)
+    return matte(a, b, order_map(t), p, t["soft"])
+
+
+def transition(sh, force_dissolve):
+    """How the change into shot `sh` is made, and how many frames before / after its start it needs."""
+    if "fx" in sh and not force_dissolve:
+        return sh["fx"]
+    d = force_dissolve or sh.get("dissolve", 4)
+    return {"type": "dissolve", "pre": d // 2, "post": d // 2}
+
+
 def dim(planes, k):
     """Fade towards black: luma to 16, colour to neutral."""
     y, u, v = planes
@@ -71,11 +112,11 @@ class Shot:
         self.matched_out = bool(nxt) and nxt["kind"] == "match"
         self.cam_in = cam_of(sh.get("cam_in"))
         self.cam_out = cam_of(nxt.get("cam_out")) if self.matched_out else IDENT
-        # frames of cross-dissolve at the change into this shot / out of it
-        self.d_in = (force_dissolve or sh.get("dissolve", 4)) if self.matched_in else 0
-        self.d_out = (force_dissolve or nxt.get("dissolve", 4)) if self.matched_out else 0
-        self.first = self.start - self.d_in // 2                            # frames needed for dissolves
-        self.last = self.end + self.d_out // 2
+        # the transition at the change into this shot / out of it
+        self.t_in = transition(sh, force_dissolve) if self.matched_in else None
+        self.t_out = transition(nxt, force_dissolve) if self.matched_out else None
+        self.first = self.start - (self.t_in["pre"] if self.t_in else 0)   # frames needed for transitions
+        self.last = self.end + (self.t_out["post"] if self.t_out else 0)
         self.cuts = [c for c in cuts if self.start < c < self.end]
         self.path = conf_dir / f"{self.src}.mp4"
         self.proc, self.pos = None, None
@@ -120,7 +161,8 @@ def main():
     ap.add_argument("--from", dest="t0", type=float, default=None)
     ap.add_argument("--to", dest="t1", type=float, default=None)
     ap.add_argument("--dissolve", type=int, default=0,
-                    help="force this many dissolve frames (even) at every matched change")
+                    help="force a dissolve of this many frames (even) at every matched change, "
+                         "also where the plan asks for a mask transition")
     ap.add_argument("--crf", type=int, default=16)
     ap.add_argument("--preset", default="slow")
     a = ap.parse_args()
@@ -160,11 +202,9 @@ def main():
         prv = shots[k - 1] if k > 0 else None
         nxt = shots[k + 1] if k + 1 < len(shots) else None
         if cur.matched_in and prv is not None and f < prv.last and f >= prv.first:
-            alpha = (f - (cur.start - cur.d_in // 2) + 1) / (cur.d_in + 1)   # weight of the incoming shot
-            img = blend(prv.read(f), img, alpha)
+            img = join(prv.read(f), img, cur.t_in, f, cur.start)
         elif cur.matched_out and nxt is not None and f >= nxt.first:
-            alpha = (f - (nxt.start - nxt.d_in // 2) + 1) / (nxt.d_in + 1)
-            img = blend(img, nxt.read(f), alpha)
+            img = join(img, nxt.read(f), cur.t_out, f, nxt.start)
         if fade and f >= f1 - fade:
             img = dim(img, (f1 - f) / fade)
         for p in img:

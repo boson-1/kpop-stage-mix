@@ -81,7 +81,7 @@ def main():
             z, o = s.camera(f)
             n, zmax = n + 1, max(zmax, z)
             border += bool(z < 1 - 1e-6 or o.max() > 1e-6 or z * sm.W + o[0] < sm.W - 1e-6 or z * sm.H + o[1] < sm.H - 1e-6)
-    print(f"camera: {n} shot frames (a dissolve counts for both shots), {border} showing a border, largest zoom {zmax:.2f}")
+    print(f"camera: {n} shot frames (a transition counts for both shots), {border} showing a border, largest zoom {zmax:.2f}")
     if border:
         failed.append("border")
 

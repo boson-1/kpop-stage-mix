@@ -7,7 +7,7 @@ description: Use when asked to make, cut, redo or fix a K-pop stage mix / 一鍵
 
 ## Overview
 
-A stage mix plays one song straight through while the picture jumps between broadcast stages. At each jump the same member's face sits at the same place and size, so only the outfit and the set change. The scripts in `scripts/` build the whole edit from the downloaded stages. Judgment is needed for four things: choosing sources, proving the stages are in sync, looking at every join, and reporting honestly.
+A stage mix plays one song straight through while the picture jumps between broadcast stages. At each jump the same member's face sits at the same place and size, so only the outfit and the set change. Most jumps are a dissolve of a few frames; those on a strong beat get a mask transition, an iris opening out of the face or a soft edge sweeping over the frame. The scripts in `scripts/` build the whole edit from the downloaded stages. Judgment is needed for four things: choosing sources, proving the stages are in sync, looking at every join, and reporting honestly.
 
 **Core principle:** after `conform.py`, frame *f* is the same instant of the choreography in every stage. Every later step addresses frames by index and trusts this. Audio sync alone does not deliver it, so the picture sync is measured (step 7), never assumed.
 
@@ -72,7 +72,7 @@ $PY -I $S/verify.py work work/edl.json ../output/<Group>_<Song>_outfit_change_mi
 | 6 faces | every log ends in `done`, and says `face models run on CUDAExecutionProvider` when there is a GPU | A stage that died is simply run again. `CUDA failure 999` (seen repeatedly under WSL2) takes down all running face jobs at once and can need two or three tries. Never continue with a missing or old `.npz`. |
 | 7 check_sync | every stage within ±0.3 frame, `fit residual rms` about 0.2 or less, no stage `NOT MEASURED` | Do the correction round below. Expect to need it once. |
 | 8 beats | plausible BPM, phase per quarter within ±25 ms | A drifting grid means a tempo change: beat rewards will be wrong in part of the song. Say so in the report. |
-| 9 plan | prints shots, changes, screen share, match quality | `no stage can open` / `no edit path`: the message names a `START_SEC` that only cuts the track's leading silence. Run `plan.py work work/edl.json START_SEC` with it. |
+| 9 plan | prints shots, changes, screen share, match quality, mask transitions | `no stage can open` / `no edit path`: the message names a `START_SEC` that only cuts the track's leading silence. Run `plan.py work work/edl.json START_SEC` with it. |
 | 10 draft | `verify.py` ends with `all checks passed`, and you have looked at every sheet | Fix the cause, render again, check again. |
 
 `vdelay.py` (step 4) has no gate: it is only the starting point for step 7, and a poor one with few stages.
@@ -108,9 +108,15 @@ Reject a join when:
 
 A `cut` row only has to show two steady pictures: the planner switches there because the new stage's own director cuts at that frame.
 
+A row labelled `iris` or `sweep` is a mask transition. Its tiles run from the frame before the transition to the frame after it, with the frame offset on each tile, and a soft edge separates the old stage from the new one: a circle growing out of the face, or a straight edge. Bodies and bystanders that do not continue across the edge are normal, because only the matched face is in register. Reject the row when:
+
+- on tile 0, where the edge passes over the matched face, the face reads as two faces or as two halves that do not fit
+- the member inside the new picture is not the one who stood there in the old picture
+- a tile shows a third picture, or an edge of the picture
+
 For a closer look at doubtful joins, and always at the five weakest that `verify.py` names: `$PY -I $S/sheet.py work/edl.json work/draft.mp4 work/sheets/close 58,54,6` (shot numbers, large tiles).
 
-Fix rejected joins by changing the planner's constants and planning again (`references/tuning.md`), not by editing the EDL by hand. Delete `work/sheets/` and repeat step 10. A join that is only borderline stays in, and goes on the list for the user.
+Rejected `match` and `cut` rows come first: change the planner's constants and plan again (`references/tuning.md`). Frames and cameras in the EDL are never edited by hand. Then every rejected `iris` or `sweep` row: for row `#N`, delete the `"fx"` entry of `shots[N]` in `work/edl.json`. This is the one hand edit there is; the change is then rendered as its dissolve, and its new row is judged like any dissolve. Planning again writes a new EDL with new shot numbers and every `"fx"` back, so the review starts over. Delete `work/sheets/` and repeat step 10. A join that is only borderline stays in, and goes on the list for the user.
 
 ## Reporting
 
@@ -118,11 +124,11 @@ You have only seen stills. The report must contain:
 
 - the file with its resolution, frame rate, duration and size
 - the stages used (show, date, video id from `sources.tsv`), and the ones left out with the reason
-- the plan's numbers: shots, face-matched changes, camera-cut switches, median shot length, share per stage, changes on the beat
+- the plan's numbers: shots, face-matched changes, mask transitions (iris and sweep as `plan.py` prints them, and how many of those you turned back into dissolves), camera-cut switches, median shot length, share per stage, changes on the beat
 - what was checked: the `verify.py` lines of the final file, the remaining sync offsets, and that every join was inspected on the sheets
 - what was not: motion, pacing and sound were never played. Ask the user to watch it once.
 - the `to watch` list from `verify.py` and your own borderline joins, with times
-- what is inherent: broadcaster logos and captions jump with the stage and move when a shot is zoomed; the mix starts after the track's leading silence when `START_SEC` was used; the last shot is held for a second and fades out
+- what is inherent: broadcaster logos and captions jump with the stage and move when a shot is zoomed; during a mask transition only the matched face continues across the edge, bodies and bystanders do not; the mix starts after the track's leading silence when `START_SEC` was used; the last shot is held for a second and fades out
 
 ## Pitfalls
 
@@ -138,9 +144,11 @@ Each of these was found by measurement and costs hours when rediscovered.
 | The planner cannot start | Clip begins after the song's first sample; `conform.py` holds its first frame and `plan.py` refuses those frames | The `START_SEC` that `plan.py` suggests |
 | A "new" stage that looks oddly familiar | Re-run programmes re-air old stages under a new date, fan "AI upscale" uploads look current | `references/sourcing.md` |
 | A stage is missing from the mix or barely used | Its faces rarely line up with the others (wide shots, different blocking) | Report it; do not force it in |
+| Making the mix fancier with longer dissolves, or with a transition that mixes both pictures over the whole frame | The stages are in register only at the matched face, and only around the frame of the change. An 8-frame luma dissolve doubled the faces on 3 of 4 changes | Use the mask transitions that exist; before adding one read `references/transitions.md` |
 | Borrowing cut points from someone else's mix of the song | The planner needs none: it works from the stages alone | Use `analyze_mix.py` / `compare.py` only when the user asks to study or compare other mixes |
 
 ## References
 
 - `references/sourcing.md`: finding, filtering, naming and downloading stages and the studio track. Read before step 1.
 - `references/tuning.md`: how the planner chooses, every constant and what to change for a given complaint, what human editors do, and the tools for studying or comparing other mixes. Read before changing a constant or when the user asks about someone else's mix.
+- `references/transitions.md`: the mask transitions and where the planner puts them, the film and television techniques that were weighed and why most were left out, and what a new transition must satisfy. Read when the user asks for another transition look, or before adding one.
