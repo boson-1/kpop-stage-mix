@@ -4,7 +4,7 @@
 
 An agent skill for Claude Code and Codex that cuts a K-pop stage mix (교차편집, 一鍵換裝): one song plays straight through while the picture jumps between the group's performances on different music shows. At every jump the same member's face stays at the same place and size, so only the outfit and the stage change.
 
-Most jumps are a dissolve of a few frames. Since v0.2, jumps that land on a strong beat get a mask transition instead: an iris that opens out of the member's face, or a soft edge that sweeps over the frame.
+Most jumps are a dissolve of a few frames. Jumps that land on a strong beat get a mask transition instead (since v0.2): a bloom, in which the new stage first shows on the member's face alone and then spreads over the frame behind a ragged, lit edge (since v0.3), or a soft edge that sweeps over the frame.
 
 Ask the agent to "make a stage mix of &lt;song&gt;" (or 「幫我剪〈歌名〉的一鍵換裝」, 「〈曲名〉のステージミックスを作って」, 「〈곡명〉 교차편집 만들어 줘」) and the skill takes over.
 
@@ -42,7 +42,7 @@ Music Bank → Show! Music Core → Inkigayo. At the second change two members s
 SKILL.md                    workflow, the pass condition of every step, known pitfalls, what to report
 references/sourcing.md      finding, choosing, naming and downloading the stages and the studio recording
 references/tuning.md        how the edit is planned and what can be tuned, how human editors work, tools to analyse and compare other mixes
-references/transitions.md   the mask transitions, the film and television techniques they were chosen from, how to add one
+references/transitions.md   the mask transitions, the techniques from film, editing software and motion libraries they were chosen from, how to add one
 scripts/                    the tools of the whole pipeline (Python + ffmpeg)
 ```
 
@@ -57,7 +57,7 @@ scripts/                    the tools of the whole pipeline (Python + ffmpeg)
 | `check_sync.py` | measures the picture sync between stages from the members' face trajectories; `--apply` writes the correction back |
 | `beats.py` | beat grid and bar starts |
 | `plan.py` | finds every point where the outfit can change, picks the edit for the whole song by dynamic programming, and gives the changes on strong beats a mask transition |
-| `render.py` | renders the edit with its dissolves, irises and sweeps, staying in YUV 4:2:0 from decoder to encoder |
+| `render.py` | renders the edit with its dissolves, blooms and sweeps, staying in YUV 4:2:0 from decoder to encoder |
 | `sheet.py` | contact sheets of the frames around every join, for checking them one by one |
 | `verify.py` | checks the finished video: decoding, audio position, no visible border, frame placement; lists what a person should watch |
 | `analyze_mix.py` | reconstructs the edit of someone else's mix by matching it against the original stages |

@@ -7,10 +7,11 @@ pictures while one replaces the other.  Between changes the camera eases back, o
 snaps back invisibly on the broadcast director's own camera cut.
 
 A change is a short cross-dissolve, or the mask transition plan.py gave it ("fx" in the EDL).
-A mask transition is a wipe in the textbook sense: a grayscale card says in which order the
-pixels change (0 first .. 1 last) and a soft edge travels through that order.
-  iris   the card is the distance from the matched face: the new stage opens out of the face
-  sweep  the card is a ramp along "dir": a straight soft edge crosses the frame
+A mask transition shows one picture on each side of an edge instead of mixing them everywhere.
+  bloom  the new stage shows on the matched face alone, holds there, then spreads over the
+         frame behind a ragged, lit edge
+  sweep  the textbook wipe: a grayscale card says in which order the pixels change (0 first ..
+         1 last), here a ramp along "dir", and a straight soft edge travels through that order
 
 Pictures stay in their native YUV 4:2:0 from decoder to encoder: going through RGB
 clips the saturated stage lighting and resamples the colour planes twice.
@@ -65,26 +66,64 @@ def blend(a, b, alpha):
 
 
 def order_map(fx):
-    """The card of a mask transition: when each pixel changes, 0 first .. 1 last."""
-    if fx["type"] == "iris":
-        g = np.hypot(XS - fx["c"][0], YS - fx["c"][1])
-    else:
-        g = XS * fx["dir"][0] + YS * fx["dir"][1]
+    """The card of a sweep: when each pixel changes, 0 first .. 1 last."""
+    g = XS * fx["dir"][0] + YS * fx["dir"][1]
     g -= g.min()
     return g / g.max()
+
+
+def mix(a, b, m):
+    """a where the mask m is 0, b where it is 1."""
+    mc = cv2.resize(m, (CW, CH), interpolation=cv2.INTER_AREA)
+    return tuple(cv2.blendLinear(x, y, 1 - w, w) for x, y, w in zip(a, b, (m, mc, mc)))
 
 
 def matte(a, b, order, p, soft):
     """a where the soft edge has not arrived yet, b where it has passed; p is the progress 0..1."""
     m = np.clip((p * (1 + soft) - order) / soft, 0, 1)
-    m = m * m * (3 - 2 * m)
-    mc = cv2.resize(m, (CW, CH), interpolation=cv2.INTER_AREA)
-    return tuple(cv2.blendLinear(x, y, 1 - w, w) for x, y, w in zip(a, b, (m, mc, mc)))
+    return mix(a, b, m * m * (3 - 2 * m))
 
 
-def join(a, b, t, f, start):
-    """Frame f of the change from picture a to picture b that the EDL puts at frame `start`."""
-    p = (f - (start - t["pre"]) + 1) / (t["pre"] + t["post"] + 1)          # in a dissolve: weight of the incoming shot
+def bloom(a, b, into, f):
+    """Frame f of a bloom: picture b shows on the matched face alone, holds there, then spreads.
+
+    The opening is an ellipse on the face of the incoming shot and follows that face.  The face
+    changes like a 2-frame dissolve, the opening waits "hold" frames, then it runs out to the
+    corners behind an edge that noise makes ragged and that is lit while it travels.
+    """
+    t, k = into.t_in, f - into.start
+    z, o = into.camera(f)
+    cx, cy = (float(v) for v in z * np.array(t["face"][k + t["pre"]]) + o)
+    r = 0.36 * z * t["size"]                                       # half width of the opening; it is 1.3 times as high
+    g = np.maximum(np.hypot((XS - cx) / r, (YS - cy) / (1.3 * r)) - 1, 0) * r         # px outside the opening
+    rng = np.random.default_rng(into.start)                        # the same ragged shape on every frame
+    n = sum(w * cv2.resize(rng.random((9 * s, 16 * s), np.float32), (W, H), interpolation=cv2.INTER_CUBIC)
+            for s, w in ((1, 4 / 7), (2, 2 / 7), (4, 1 / 7)))
+    g = np.maximum(g + (2 * n - 1) * np.minimum(g, 0.9 * r + 0.45 * g), 0)            # none on the face, more far out
+    hold, u = t["hold"], 0.0
+    x = 0.08 * r * min(max(k, 0), hold)                            # px beyond the opening that have changed
+    if k > hold:
+        u = (k - hold) / (t["post"] - hold)                        # share of the way out, slow at first
+        x += (float(g.max()) - x) * u ** 2.2
+    soft = 0.6 * r + 0.1 * x
+    m = np.clip((x + soft - g) / soft, 0, 1)
+    m = m * m * (3 - 2 * m) * min(1.0, (k + t["pre"] + 1) / (t["pre"] + 2))
+    y, cb, cr = mix(a, b, m)
+    if not u or not t["glow"]:
+        return y, cb, cr
+    lit = 4 * m * (1 - m) * (4 * u * (1 - u)) ** 0.5               # on the edge only, none as it sets off and arrives
+    lc = 0.6 * cv2.resize(lit, (CW, CH), interpolation=cv2.INTER_AREA)
+    grey = np.full((CH, CW), 128, np.uint8)
+    y = np.maximum(y, np.minimum(cv2.add(y, (t["glow"] * lit).astype(np.uint8)), 235))
+    return y, cv2.blendLinear(cb, grey, 1 - lc, lc), cv2.blendLinear(cr, grey, 1 - lc, lc)
+
+
+def join(a, b, into, f):
+    """Frame f of the change from picture a to picture b, the picture of shot `into`."""
+    t = into.t_in
+    if t["type"] == "bloom":
+        return bloom(a, b, into, f)
+    p = (f - (into.start - t["pre"]) + 1) / (t["pre"] + t["post"] + 1)     # in a dissolve: weight of the incoming shot
     if t["type"] == "dissolve":
         return blend(a, b, p)
     return matte(a, b, order_map(t), p, t["soft"])
@@ -202,9 +241,9 @@ def main():
         prv = shots[k - 1] if k > 0 else None
         nxt = shots[k + 1] if k + 1 < len(shots) else None
         if cur.matched_in and prv is not None and f < prv.last and f >= prv.first:
-            img = join(prv.read(f), img, cur.t_in, f, cur.start)
+            img = join(prv.read(f), img, cur, f)
         elif cur.matched_out and nxt is not None and f >= nxt.first:
-            img = join(img, nxt.read(f), cur.t_out, f, nxt.start)
+            img = join(img, nxt.read(f), nxt, f)
         if fade and f >= f1 - fade:
             img = dim(img, (f1 - f) / fade)
         for p in img:

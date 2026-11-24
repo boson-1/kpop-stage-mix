@@ -7,7 +7,7 @@ description: Use when asked to make, cut, redo or fix a K-pop stage mix / 一鍵
 
 ## Overview
 
-A stage mix plays one song straight through while the picture jumps between broadcast stages. At each jump the same member's face sits at the same place and size, so only the outfit and the set change. Most jumps are a dissolve of a few frames; those on a strong beat get a mask transition, an iris opening out of the face or a soft edge sweeping over the frame. The scripts in `scripts/` build the whole edit from the downloaded stages. Judgment is needed for four things: choosing sources, proving the stages are in sync, looking at every join, and reporting honestly.
+A stage mix plays one song straight through while the picture jumps between broadcast stages. At each jump the same member's face sits at the same place and size, so only the outfit and the set change. Most jumps are a dissolve of a few frames; many of those on a strong beat get a mask transition instead: a bloom, in which the new stage shows on the face first and then spreads over the frame, or a soft edge sweeping over the frame. The scripts in `scripts/` build the whole edit from the downloaded stages. Judgment is needed for four things: choosing sources, proving the stages are in sync, looking at every join, and reporting honestly.
 
 **Core principle:** after `conform.py`, frame *f* is the same instant of the choreography in every stage. Every later step addresses frames by index and trusts this. Audio sync alone does not deliver it, so the picture sync is measured (step 7), never assumed.
 
@@ -108,15 +108,29 @@ Reject a join when:
 
 A `cut` row only has to show two steady pictures: the planner switches there because the new stage's own director cuts at that frame.
 
-A row labelled `iris` or `sweep` is a mask transition. Its tiles run from the frame before the transition to the frame after it, with the frame offset on each tile, and a soft edge separates the old stage from the new one: a circle growing out of the face, or a straight edge. Bodies and bystanders that do not continue across the edge are normal, because only the matched face is in register. Reject the row when:
+A row labelled `bloom` or `sweep` is a mask transition. Its tiles run from the frame before the transition to the frame after it, with the frame offset on each tile. Bodies and bystanders that do not continue from the old picture into the new one are normal, because only the matched face is in register.
 
-- on tile 0, where the edge passes over the matched face, the face reads as two faces or as two halves that do not fit
+- `sweep`: a straight soft edge separates the old stage from the new one, and on tile 0 it passes over the matched face.
+- `bloom`: the new stage shows through an opening, an ellipse on the matched face that follows the face. On tile 0 the face is changing inside it. On the next tile the new face sits in the old picture, in the old hair and outfit, with little or nothing of the new stage around it. After that the opening spreads over the frame behind a ragged, bright edge.
+
+Reject the row when:
+
+- on tile 0 the matched face reads as two faces or as two halves that do not fit
+- on the tile after it, the new face of a `bloom` is not where the old face was: it is cut off by the opening, or sits beside the old head
 - the member inside the new picture is not the one who stood there in the old picture
 - a tile shows a third picture, or an edge of the picture
 
+In a `bloom`, a patch of the new stage's background beside the new face (a narrower or turned head) is borderline, not a reject, as long as the face itself is whole and in place.
+
 For a closer look at doubtful joins, and always at the five weakest that `verify.py` names: `$PY -I $S/sheet.py work/edl.json work/draft.mp4 work/sheets/close 58,54,6` (shot numbers, large tiles).
 
-Rejected `match` and `cut` rows come first: change the planner's constants and plan again (`references/tuning.md`). Frames and cameras in the EDL are never edited by hand. Then every rejected `iris` or `sweep` row: for row `#N`, delete the `"fx"` entry of `shots[N]` in `work/edl.json`. This is the one hand edit there is; the change is then rendered as its dissolve, and its new row is judged like any dissolve. Planning again writes a new EDL with new shot numbers and every `"fx"` back, so the review starts over. Delete `work/sheets/` and repeat step 10. A join that is only borderline stays in, and goes on the list for the user.
+Rejected `match` and `cut` rows come first: change the planner's constants and plan again (`references/tuning.md`). Frames and cameras in the EDL are never edited by hand. Then every rejected `bloom` or `sweep` row: note its time and type for the report, and remove the `"fx"` entry of its shot from `work/edl.json`. `N` is the number on the row's label:
+
+```bash
+$PY -I -c 'import json, sys; e = json.load(open("work/edl.json")); [e["shots"][int(n)].pop("fx") for n in sys.argv[1:]]; json.dump(e, open("work/edl.json", "w"), indent=1)' N N
+```
+
+This is the one hand edit there is; the change is then rendered as its dissolve, and its new row is judged like any dissolve. A single rejected row is a case for this edit; most rows of one kind rejected is a case for the constants (`references/tuning.md`). Planning again writes a new EDL with every `"fx"` back, and with new shot numbers unless only `FX_` constants changed, so the review starts over. Delete `work/sheets/` and repeat step 10. A join that is only borderline stays in, and goes on the list for the user.
 
 ## Reporting
 
@@ -124,11 +138,11 @@ You have only seen stills. The report must contain:
 
 - the file with its resolution, frame rate, duration and size
 - the stages used (show, date, video id from `sources.tsv`), and the ones left out with the reason
-- the plan's numbers: shots, face-matched changes, mask transitions (iris and sweep as `plan.py` prints them, and how many of those you turned back into dissolves), camera-cut switches, median shot length, share per stage, changes on the beat
+- the plan's numbers: shots, face-matched changes, mask transitions (bloom and sweep as `plan.py` prints them, and which of those you turned back into dissolves, with times), camera-cut switches, median shot length, share per stage, changes on the beat
 - what was checked: the `verify.py` lines of the final file, the remaining sync offsets, and that every join was inspected on the sheets
 - what was not: motion, pacing and sound were never played. Ask the user to watch it once.
 - the `to watch` list from `verify.py` and your own borderline joins, with times
-- what is inherent: broadcaster logos and captions jump with the stage and move when a shot is zoomed; during a mask transition only the matched face continues across the edge, bodies and bystanders do not; the mix starts after the track's leading silence when `START_SEC` was used; the last shot is held for a second and fades out
+- what is inherent: broadcaster logos and captions jump with the stage and move when a shot is zoomed; during a mask transition only the matched face continues from one picture into the other, bodies and bystanders do not, and a bloom shows the new face in the old hair and outfit for a few frames on purpose; the mix starts after the track's leading silence when `START_SEC` was used; the last shot is held for a second and fades out
 
 ## Pitfalls
 
@@ -151,4 +165,4 @@ Each of these was found by measurement and costs hours when rediscovered.
 
 - `references/sourcing.md`: finding, filtering, naming and downloading stages and the studio track. Read before step 1.
 - `references/tuning.md`: how the planner chooses, every constant and what to change for a given complaint, what human editors do, and the tools for studying or comparing other mixes. Read before changing a constant or when the user asks about someone else's mix.
-- `references/transitions.md`: the mask transitions and where the planner puts them, the film and television techniques that were weighed and why most were left out, and what a new transition must satisfy. Read when the user asks for another transition look, or before adding one.
+- `references/transitions.md`: the mask transitions and where the planner puts them, the techniques from film, editing software and motion libraries that were weighed and why most were left out, and what a new transition must satisfy. Read when the user asks for another transition look, or before adding one.
