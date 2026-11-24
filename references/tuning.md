@@ -24,7 +24,7 @@ A second kind of change needs no face: at a frame where a stage's own director c
 
 **3. How a change is rendered.** Both pictures are zoomed and shifted so the face coincides, cross-dissolved over 2 frames (`q` of 0.5 or more) or 4 frames. Between changes the virtual camera eases from one alignment to the next, or snaps back unseen on the director's own cut.
 
-**4. Which changes get a mask transition.** A face-matched change that lands on every `FX_EVERY`-th beat is rendered as a bloom (one matched face, on a bar start) or a sweep instead of the dissolve, when both faces stay on screen for its `FX_LEN` frames and no other mask transition is within `FX_GAP` frames. Bar starts choose first. The path from step 2 is not changed by this. `references/transitions.md` has the transitions and the reasons.
+**4. Which changes get a mask transition.** A face-matched change that lands on every `FX_EVERY`-th beat is rendered as a mask transition instead of the dissolve, when both faces stay on screen for its `FX_LEN` frames and no other mask transition is within `FX_GAP` frames. With one matched face it is a bloom on every `FX_BLOOM`-th beat, an iris on the other bar starts and a sweep down the body on the other strong beats; with several matched faces, a sweep across. Bar starts choose first. The path from step 2 is not changed by this. `references/transitions.md` has the transitions and the reasons.
 
 ## Constants (top of `scripts/plan.py`)
 
@@ -38,9 +38,10 @@ A second kind of change needs no face: at a frame where a stage's own director c
 | `SIM_SAME` | 0.42 | identity similarity that counts as the same member |
 | `PER_SWITCH` | 0.50 | fixed cost of any change |
 | `FX_EVERY` | 2 | mask transitions on changes that hit every n-th beat: 2 is beats 1 and 3 of the bar, 4 bar starts only, 1 any beat, 0 none |
+| `FX_BLOOM` | 8 | bar starts on every n-th beat get a bloom, the other bar starts an iris. A multiple of 4: 8 is the start of every second bar, 16 of every fourth, 4 every bar start, 0 none |
 | `FX_GAP` | 30 | frames without a mask transition between two of them |
-| `FX_LEN` | 10 | frames a sweep takes, and a bloom after the frame of the change |
-| `FX_SOFT` | 0.15 | width of a sweep's soft edge, as a share of the way the edge travels |
+| `FX_LEN` | 10 | frames an iris or a sweep takes, and a bloom after the frame of the change |
+| `FX_SOFT` | 0.15 | width of the soft edge of an iris or a sweep, as a share of the way the edge travels |
 | `FX_HOLD` | 3 | frames a bloom shows the new face alone before it spreads. They are part of `FX_LEN`: the spread gets the frames that are left, so leave it at least 5 |
 | `FX_GLOW` | 90 | brightness added on the spreading edge of a bloom, out of 255; 0 is none |
 
@@ -60,7 +61,9 @@ These are judgment values, not derived ones. Only `PER_SWITCH` and the screen-ti
 | Too many mask transitions, or none wanted | `FX_EVERY` 4 (bar starts only) or 0 (none); or raise `FX_GAP` |
 | More mask transitions wanted | lower `FX_GAP` (15); `FX_EVERY` 1 |
 | A mask transition looks slow | lower `FX_LEN` (8) |
-| The edge of a sweep is too hard | raise `FX_SOFT` (0.25) |
+| The edge of an iris or a sweep is too hard | raise `FX_SOFT` (0.25) |
+| Fewer blooms and more irises wanted | `FX_BLOOM` 16 |
+| Only blooms, or only irises, wanted on bar starts | `FX_BLOOM` 4, or 0. Changes with several matched faces keep their sweep |
 | Many `bloom` rows are rejected because the new face has left the old head before the spread | lower `FX_HOLD` (2) |
 | In a bloom the new face waits too long before the picture follows | lower `FX_HOLD` (2), then `FX_LEN` (8). The spread starts slowly on purpose: the exponent `2.2` in `bloom`, `render.py` |
 | The opening of a bloom shows too much, or too little, around the face | the `0.36` in `bloom`, `render.py`: half the opening's width, in face heights |

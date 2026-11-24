@@ -7,7 +7,7 @@
    between ~1 and ~7 seconds, never bounce straight back to the stage just left,
    and spread screen time over all stages.
 3. Give face-matched changes that land on a strong beat a mask transition (mask_fx):
-   a bloom out of the face or a sweep.  The others keep the short cross-dissolve.
+   a bloom or an iris out of the face, or a sweep.  The others keep the short cross-dissolve.
 
 usage: plan.py WORK_DIR OUT_EDL.json [START_SEC]
 START_SEC: song time the mix opens at (default 0) - skips a silent lead-in of the reference track.
@@ -31,9 +31,10 @@ MIN_SEG = 12                 # frames a picture must stay up next to a change (n
 SIM_SAME = 0.42              # identity similarity above which two faces are the same member
 PER_SWITCH = 0.50            # what a change must be worth to happen at all
 FX_EVERY = 2                 # mask transitions on changes that hit every n-th beat (4: bar starts only, 1: any beat, 0: none)
+FX_BLOOM = 8                 # bar starts on every n-th beat get a bloom, the other bar starts an iris (4: bloom on all, 0: on none)
 FX_GAP = 30                  # frames without a mask transition between two of them
-FX_LEN = 10                  # frames a sweep takes, and a bloom after the frame of the change
-FX_SOFT = 0.15               # width of a sweep's soft edge, as a share of the way the edge travels
+FX_LEN = 10                  # frames an iris or a sweep takes, and a bloom after the frame of the change
+FX_SOFT = 0.15               # width of the soft edge of an iris or a sweep, as a share of the way the edge travels
 FX_HOLD = 3                  # frames of FX_LEN a bloom shows the new face alone before it spreads
 FX_GLOW = 90                 # brightness added on the spreading edge of a bloom, out of 255 (0: none)
 
@@ -114,14 +115,16 @@ def len_score(L):
     return s - 0.35 * (np.maximum(L - 120, 0) / 30) ** 1.5                # dragging on
 
 
-def mask_fx(r, bar_start, into):
-    """Mask transition for the face-matched change of candidate row r into stage `into`, or None.
+def mask_fx(r, k, into):
+    """Mask transition for the face-matched change of candidate row r, on beat k, into stage `into`.
 
     Several faces matched: a sweep across the frame, the way the faces are travelling.
-    One face: a bloom out of it on a bar start, a sweep down the body on other beats.
+    One face: on a bar start a bloom out of it (every FX_BLOOM-th beat) or an iris opening out of
+    it, on other beats a sweep down the body.
     Either way the matched face changes on the frame of the change: the one moment at which the
-    two pictures are known to be in register there.  A sweep times its soft edge to pass the face
-    then.  A bloom changes the face first and follows the new face, which must stay tracked.
+    two pictures are known to be in register there.  An iris or a sweep times its soft edge to pass
+    the face then.  A bloom changes the face first and follows the new face, which must stay
+    tracked; where it does not, the change gets the iris.
     """
     A, B = SRC[int(r[1])], SRC[int(r[2])]
     i, j = sm.match_frames(A, B, int(r[0]))["pairs"][0]
@@ -129,14 +132,14 @@ def mask_fx(r, bar_start, into):
     if r[14] > 1:
         right = bool(A.center[A.follow(i, WIN)][0] >= A.center[A.follow(i, -WIN)][0])
         fx, at = {"type": "sweep", "dir": [1, 0] if right else [-1, 0]}, c[0] / sm.W if right else 1 - c[0] / sm.W
-    elif bar_start:
+    elif k % 4 == 0:
         S, d = (A, i) if into == int(r[1]) else (B, j)
-        dets = [S.follow(d, k) for k in range(-1, FX_LEN)]           # the new face, from the frame before the change
-        if min(dets) < 0:
-            return None
-        return {"type": "bloom", "pre": 1, "post": FX_LEN, "hold": FX_HOLD, "glow": FX_GLOW,
-                "size": round(float(S.size[d]), 1),                  # height of the new face, in its own stage
-                "face": [[round(float(v), 1) for v in S.center[n]] for n in dets]}
+        dets = [S.follow(d, n) for n in range(-1, FX_LEN)]           # the new face, from the frame before the change
+        if FX_BLOOM and k % FX_BLOOM == 0 and min(dets) >= 0:
+            return {"type": "bloom", "pre": 1, "post": FX_LEN, "hold": FX_HOLD, "glow": FX_GLOW,
+                    "size": round(float(S.size[d]), 1),              # height of the new face, in its own stage
+                    "face": [[round(float(v), 1) for v in S.center[n]] for n in dets]}
+        fx, at = {"type": "iris", "c": [round(float(c[0]), 1), round(float(c[1]), 1)]}, 0.0
     else:
         fx, at = {"type": "sweep", "dir": [0, 1]}, c[1] / sm.H
     # frames before the change at which the edge sets off, so that it is half way over the face at the change
@@ -353,9 +356,7 @@ def main():
             k = int(round(t / beats["period"]))
             if not FX_EVERY or k % FX_EVERY or (k % 4 == 0) != bar_start or abs(t - k * beats["period"]) * sm.FPS > 0.8:
                 continue
-            fx = mask_fx(r, bar_start, s)
-            if fx is None:
-                continue
+            fx = mask_fx(r, k, s)
             lo, hi = span(i, fx)
             # both faces on screen for as long as both pictures are needed, which also rules out a camera cut;
             # steady picture between this change and its neighbours; and no other mask transition close by
@@ -374,7 +375,7 @@ def main():
           f"{sum(1 for s in shots if s.get('beat', 0) > 0.07)}/{len(qs)}")
     fxs = [s["fx"]["type"] for s in shots if "fx" in s]
     print(f"mask transitions: {len(fxs)} of the {len(qs)} face-matched changes ("
-          + ", ".join(f"{fxs.count(t)} {t}" for t in ("bloom", "sweep")) + "), the others dissolve")
+          + ", ".join(f"{fxs.count(t)} {t}" for t in ("bloom", "iris", "sweep")) + "), the others dissolve")
 
 
 if __name__ == "__main__":

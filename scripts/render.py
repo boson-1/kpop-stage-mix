@@ -10,8 +10,10 @@ A change is a short cross-dissolve, or the mask transition plan.py gave it ("fx"
 A mask transition shows one picture on each side of an edge instead of mixing them everywhere.
   bloom  the new stage shows on the matched face alone, holds there, then spreads over the
          frame behind a ragged, lit edge
-  sweep  the textbook wipe: a grayscale card says in which order the pixels change (0 first ..
-         1 last), here a ramp along "dir", and a straight soft edge travels through that order
+  iris   the textbook wipe: a grayscale card says in which order the pixels change (0 first ..
+         1 last) and a soft edge travels through that order.  Here the card is the distance
+         from the matched face: the new stage opens out of the face in a growing circle
+  sweep  the same wipe with a ramp along "dir" as the card: a straight soft edge crosses the frame
 
 Pictures stay in their native YUV 4:2:0 from decoder to encoder: going through RGB
 clips the saturated stage lighting and resamples the colour planes twice.
@@ -66,8 +68,11 @@ def blend(a, b, alpha):
 
 
 def order_map(fx):
-    """The card of a sweep: when each pixel changes, 0 first .. 1 last."""
-    g = XS * fx["dir"][0] + YS * fx["dir"][1]
+    """The card of an iris or a sweep: when each pixel changes, 0 first .. 1 last."""
+    if fx["type"] == "iris":
+        g = np.hypot(XS - fx["c"][0], YS - fx["c"][1])
+    else:
+        g = XS * fx["dir"][0] + YS * fx["dir"][1]
     g -= g.min()
     return g / g.max()
 

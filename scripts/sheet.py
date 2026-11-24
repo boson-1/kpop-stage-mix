@@ -1,7 +1,7 @@
 """Contact sheets of the stage changes in a full-length render, for eyeballing the joins.
 
 Each row is one change: frames -3 -2 -1 | 0 +1 +3 around the first frame of the new stage.
-A mask transition (bloom, sweep) takes longer, so its row runs from the frame before it
+A mask transition (bloom, iris, sweep) takes longer, so its row runs from the frame before it
 starts to the frame after it ends; every tile carries its frame offset, and 0 is always there.
 Label:  #shot  time in the video  from>to stage  kind (or the mask transition), and for a face-matched change
   q     how invisible the plan expects the join to be, 0..1

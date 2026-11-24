@@ -4,13 +4,45 @@
 
 An agent skill for Claude Code and Codex that cuts a K-pop stage mix (교차편집, 一鍵換裝): one song plays straight through while the picture jumps between the group's performances on different music shows. At every jump the same member's face stays at the same place and size, so only the outfit and the stage change.
 
-Most jumps are a dissolve of a few frames. Jumps that land on a strong beat get a mask transition instead (since v0.2): a bloom, in which the new stage first shows on the member's face alone and then spreads over the frame behind a ragged, lit edge (since v0.3), or a soft edge that sweeps over the frame.
+Most jumps are a dissolve of a few frames. Jumps that land on a strong beat get a mask transition instead: a bloom, in which the new stage first shows on the member's face alone and then spreads over the frame behind a ragged, lit edge; an iris, a circle that opens out of the face; or a soft edge that sweeps over the frame.
 
 Ask the agent to "make a stage mix of &lt;song&gt;" (or 「幫我剪〈歌名〉的一鍵換裝」, 「〈曲名〉のステージミックスを作って」, 「〈곡명〉 교차편집 만들어 줘」) and the skill takes over.
 
 ## Samples
 
-All four excerpts come from mixes the pipeline cut fully automatically; no join was fixed by hand. They were made with v0.1, so every change in them is a dissolve. The GIFs are 480 px wide; the first two run at 15 fps, the last two at 29.97 fps.
+All excerpts come from mixes the pipeline cut fully automatically; no join was fixed by hand. The GIFs are 480 px wide.
+
+### Mask transitions
+
+Cut with v0.4. The GIFs run at 29.97 fps, so every frame of a transition is in them.
+
+**Bloom: BESTie "Love Options", 0:46–0:48**
+
+Show! Music Core (Oct 31) → Show! Music Core (Nov 14). The new stage first shows on the member's face alone, in the old hair and outfit, then spreads over the frame behind a ragged, lit edge. Used where one face is matched and the change lands on the start of every second bar.
+
+![Love Options: a bloom out of the face](samples/love_options_bloom.gif)
+
+**Iris: BESTie "Love Options", 0:55–0:58**
+
+Inkigayo → Show! Music Core (Oct 31). A soft-edged circle opens out of the matched face. Used on the other bar starts.
+
+![Love Options: an iris opening out of the face](samples/love_options_iris.gif)
+
+**Sweep down: A2O LITE "NEON", 2:52–2:54**
+
+M Countdown → THE SHOW. A soft edge runs down the frame and passes the matched face on the frame of the change. Used on beat 3 of the bar.
+
+![NEON: a sweep down the body](samples/neon_sweep_down.gif)
+
+**Sweep across: BESTie "Love Options", 0:22–0:24**
+
+Show! Music Core (Oct 31) → Inkigayo. Two members are matched, so the edge crosses the frame the way they are moving. It is the second change of the last dissolve sample below.
+
+![Love Options: a sweep across two members](samples/love_options_sweep_across.gif)
+
+### Dissolves
+
+Most changes are still a dissolve of 2 to 4 frames. These four excerpts were cut with v0.1, where every change was one. The first two run at 15 fps, the last two at 29.97 fps.
 
 **Rapid changes: A2O LITE "NEON", 1:05–1:11 of the mix**
 
@@ -57,7 +89,7 @@ scripts/                    the tools of the whole pipeline (Python + ffmpeg)
 | `check_sync.py` | measures the picture sync between stages from the members' face trajectories; `--apply` writes the correction back |
 | `beats.py` | beat grid and bar starts |
 | `plan.py` | finds every point where the outfit can change, picks the edit for the whole song by dynamic programming, and gives the changes on strong beats a mask transition |
-| `render.py` | renders the edit with its dissolves, blooms and sweeps, staying in YUV 4:2:0 from decoder to encoder |
+| `render.py` | renders the edit with its dissolves, blooms, irises and sweeps, staying in YUV 4:2:0 from decoder to encoder |
 | `sheet.py` | contact sheets of the frames around every join, for checking them one by one |
 | `verify.py` | checks the finished video: decoding, audio position, no visible border, frame placement; lists what a person should watch |
 | `analyze_mix.py` | reconstructs the edit of someone else's mix by matching it against the original stages |

@@ -7,7 +7,7 @@ description: Use when asked to make, cut, redo or fix a K-pop stage mix / 一鍵
 
 ## Overview
 
-A stage mix plays one song straight through while the picture jumps between broadcast stages. At each jump the same member's face sits at the same place and size, so only the outfit and the set change. Most jumps are a dissolve of a few frames; many of those on a strong beat get a mask transition instead: a bloom, in which the new stage shows on the face first and then spreads over the frame, or a soft edge sweeping over the frame. The scripts in `scripts/` build the whole edit from the downloaded stages. Judgment is needed for four things: choosing sources, proving the stages are in sync, looking at every join, and reporting honestly.
+A stage mix plays one song straight through while the picture jumps between broadcast stages. At each jump the same member's face sits at the same place and size, so only the outfit and the set change. Most jumps are a dissolve of a few frames; many of those on a strong beat get a mask transition instead: a bloom, in which the new stage shows on the face first and then spreads over the frame, an iris opening out of the face, or a soft edge sweeping over the frame. The scripts in `scripts/` build the whole edit from the downloaded stages. Judgment is needed for four things: choosing sources, proving the stages are in sync, looking at every join, and reporting honestly.
 
 **Core principle:** after `conform.py`, frame *f* is the same instant of the choreography in every stage. Every later step addresses frames by index and trusts this. Audio sync alone does not deliver it, so the picture sync is measured (step 7), never assumed.
 
@@ -108,9 +108,9 @@ Reject a join when:
 
 A `cut` row only has to show two steady pictures: the planner switches there because the new stage's own director cuts at that frame.
 
-A row labelled `bloom` or `sweep` is a mask transition. Its tiles run from the frame before the transition to the frame after it, with the frame offset on each tile. Bodies and bystanders that do not continue from the old picture into the new one are normal, because only the matched face is in register.
+A row labelled `bloom`, `iris` or `sweep` is a mask transition. Its tiles run from the frame before the transition to the frame after it, with the frame offset on each tile. Bodies and bystanders that do not continue from the old picture into the new one are normal, because only the matched face is in register.
 
-- `sweep`: a straight soft edge separates the old stage from the new one, and on tile 0 it passes over the matched face.
+- `iris` and `sweep`: a soft edge separates the old stage from the new one, a circle growing out of the matched face or a straight edge. On tile 0 it passes over the matched face.
 - `bloom`: the new stage shows through an opening, an ellipse on the matched face that follows the face. On tile 0 the face is changing inside it. On the next tile the new face sits in the old picture, in the old hair and outfit, with little or nothing of the new stage around it. After that the opening spreads over the frame behind a ragged, bright edge.
 
 Reject the row when:
@@ -124,7 +124,7 @@ In a `bloom`, a patch of the new stage's background beside the new face (a narro
 
 For a closer look at doubtful joins, and always at the five weakest that `verify.py` names: `$PY -I $S/sheet.py work/edl.json work/draft.mp4 work/sheets/close 58,54,6` (shot numbers, large tiles).
 
-Rejected `match` and `cut` rows come first: change the planner's constants and plan again (`references/tuning.md`). Frames and cameras in the EDL are never edited by hand. Then every rejected `bloom` or `sweep` row: note its time and type for the report, and remove the `"fx"` entry of its shot from `work/edl.json`. `N` is the number on the row's label:
+Rejected `match` and `cut` rows come first: change the planner's constants and plan again (`references/tuning.md`). Frames and cameras in the EDL are never edited by hand. Then every rejected `bloom`, `iris` or `sweep` row: note its time and type for the report, and remove the `"fx"` entry of its shot from `work/edl.json`. `N` is the number on the row's label:
 
 ```bash
 $PY -I -c 'import json, sys; e = json.load(open("work/edl.json")); [e["shots"][int(n)].pop("fx") for n in sys.argv[1:]]; json.dump(e, open("work/edl.json", "w"), indent=1)' N N
@@ -138,7 +138,7 @@ You have only seen stills. The report must contain:
 
 - the file with its resolution, frame rate, duration and size
 - the stages used (show, date, video id from `sources.tsv`), and the ones left out with the reason
-- the plan's numbers: shots, face-matched changes, mask transitions (bloom and sweep as `plan.py` prints them, and which of those you turned back into dissolves, with times), camera-cut switches, median shot length, share per stage, changes on the beat
+- the plan's numbers: shots, face-matched changes, mask transitions (bloom, iris and sweep as `plan.py` prints them, and which of those you turned back into dissolves, with times), camera-cut switches, median shot length, share per stage, changes on the beat
 - what was checked: the `verify.py` lines of the final file, the remaining sync offsets, and that every join was inspected on the sheets
 - what was not: motion, pacing and sound were never played. Ask the user to watch it once.
 - the `to watch` list from `verify.py` and your own borderline joins, with times

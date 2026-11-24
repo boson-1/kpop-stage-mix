@@ -4,13 +4,45 @@
 
 給 Claude Code 與 Codex 使用的 Agent Skill：把同一首歌在各音樂節目的打歌舞台，剪成一支「一鍵換裝」stage mix（교차편집）。整首歌連續播放，畫面在不同場次之間切換，切換瞬間同一位成員的臉停在同樣的位置與大小，只有服裝和舞台換掉。
 
-大部分的切換是幾格長的疊化。落在強拍上的切換改用遮罩轉場（v0.2 起）：bloom 是新舞台先只出現在成員的臉上，停幾格後帶著不規則的發亮邊緣擴散到整個畫面（v0.3 起）；sweep 是一道柔邊掃過整個畫面。
+大部分的切換是幾格長的疊化。落在強拍上的切換改用遮罩轉場：bloom 是新舞台先只出現在成員的臉上，停幾格後帶著不規則的發亮邊緣擴散到整個畫面；iris 是從臉向外展開的圓；sweep 是一道柔邊掃過整個畫面。
 
 對 agent 說「幫我剪〈歌名〉的一鍵換裝」（或 "make a stage mix of …"、「〈曲名〉のステージミックスを作って」、「〈곡명〉 교차편집 만들어 줘」）就會觸發。
 
 ## 樣片
 
-以下四段都節錄自這套流程全自動剪出的成片，沒有手動修過接點。它們是 v0.1 剪的，所以每個切換都是疊化。GIF 寬 480 px；前兩段為 15 fps，後兩段為 29.97 fps。
+以下各段都節錄自這套流程全自動剪出的成片，沒有手動修過接點。GIF 寬 480 px。
+
+### 遮罩轉場
+
+以 v0.4 剪出。GIF 為 29.97 fps，轉場的每一格都在裡面。
+
+**Bloom：BESTie〈Love Options〉，成片 0:46–0:48**
+
+Show! Music Core 10/31 → Show! Music Core 11/14。新舞台先只出現在成員的臉上，髮型和服裝還是舊的，接著帶著不規則的發亮邊緣擴散到整個畫面。用在只對上一張臉、而且落在每兩小節起點的切換。
+
+![Love Options：從臉擴散的 bloom](samples/love_options_bloom.gif)
+
+**Iris：BESTie〈Love Options〉，成片 0:55–0:58**
+
+人氣歌謠 → Show! Music Core 10/31。一個柔邊的圓從對位的臉向外展開。用在其餘的小節起點。
+
+![Love Options：從臉展開的 iris](samples/love_options_iris.gif)
+
+**由上往下的 sweep：A2O LITE〈NEON〉，成片 2:52–2:54**
+
+M Countdown → THE SHOW。一道柔邊由上往下掃過畫面，在切換的那一格通過對位的臉。用在小節的第 3 拍。
+
+![NEON：由上往下的 sweep](samples/neon_sweep_down.gif)
+
+**橫向的 sweep：BESTie〈Love Options〉，成片 0:22–0:24**
+
+Show! Music Core 10/31 → 人氣歌謠。對上兩位成員，所以柔邊順著她們移動的方向橫掃畫面。這和下方最後一段疊化樣片的第二次切換是同一個位置。
+
+![Love Options：橫掃兩位成員的 sweep](samples/love_options_sweep_across.gif)
+
+### 疊化
+
+大部分的切換仍是 2 到 4 格的疊化。以下四段是 v0.1 剪的，當時每個切換都是疊化。前兩段為 15 fps，後兩段為 29.97 fps。
 
 **連續切換：A2O LITE〈NEON〉，成片 1:05–1:11**
 
@@ -57,7 +89,7 @@ scripts/                    整條流程的工具（Python + ffmpeg）
 | `check_sync.py` | 用成員臉部運動軌跡量測各場之間的畫面同步，`--apply` 寫回校正 |
 | `beats.py` | 節拍格線與小節起點 |
 | `plan.py` | 找出所有可換裝的位置，用動態規劃選出整首歌的剪接表，並替落在強拍上的切換指定遮罩轉場 |
-| `render.py` | 依剪接表算圖（疊化、bloom、sweep），全程 YUV 4:2:0 |
+| `render.py` | 依剪接表算圖（疊化、bloom、iris、sweep），全程 YUV 4:2:0 |
 | `sheet.py` | 每個接點前後的截圖表，供逐一檢查 |
 | `verify.py` | 成片驗證：解碼、音訊位置、不露邊、畫面格位，並列出需要人看的地方 |
 | `analyze_mix.py` | 對照原始舞台，逆向還原別人作品的剪接表 |
